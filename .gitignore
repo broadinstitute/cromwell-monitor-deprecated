@@ -1,0 +1,9 @@
+/**/*
+
+!/.gitignore
+!/.dockerignore
+!/Dockerfile
+!/requirements.txt
+!/TestMonitoring.wdl
+!/monitor.py
+!/README.md
