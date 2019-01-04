@@ -25,9 +25,8 @@ def reset():
   memory_used = 0
 
   disk_used = 0
-  disk_io = ps.disk_io_counters()
-  disk_reads = disk_io.read_count
-  disk_writes = disk_io.write_count
+  disk_reads = disk_io('read_count')
+  disk_writes = disk_io('write_count')
 
   report_time = 0
 
@@ -48,6 +47,9 @@ def disk_usage(param):
     lambda usage, mount: usage + getattr(ps.disk_usage(mount), param),
     DISK_MOUNTS, 0,
   )
+
+def disk_io(param):
+  return getattr(ps.disk_io_counters(), param)
 
 def format_gb(value_bytes):
   return '%.1f' % round(value_bytes / 2**30, 1)
@@ -88,17 +90,14 @@ def get_time_series(metric_descriptor, value):
   return series
 
 def report():
-  cpu_percent = ps.cpu_percent()
-  disk_io = ps.disk_io_counters()
-
   create_time_series([
-    get_time_series(CPU_UTILIZATION_METRIC, { 'double_value': cpu_percent }),
+    get_time_series(CPU_UTILIZATION_METRIC, { 'double_value': ps.cpu_percent() }),
     get_time_series(MEMORY_UTILIZATION_METRIC, { 'double_value': memory_used / MEMORY_SIZE * 100 }),
     get_time_series(DISK_UTILIZATION_METRIC, { 'double_value': disk_used / DISK_SIZE * 100 }),
-    get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io.read_count - disk_reads) / report_time }),
-    get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io.write_count - disk_writes) / report_time }),
-    get_time_series(DISK_IN_METRIC, { 'int64_value': disk_io.read_bytes }),
-    get_time_series(DISK_OUT_METRIC, { 'int64_value': disk_io.write_bytes }),
+    get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io('read_count') - disk_reads) / report_time }),
+    get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io('write_count') - disk_writes) / report_time }),
+    get_time_series(DISK_IN_METRIC, { 'int64_value': disk_io('read_bytes') }),
+    get_time_series(DISK_OUT_METRIC, { 'int64_value': disk_io('write_bytes') - DISK_SIZE }),
   ])
 
 ### Define constants
