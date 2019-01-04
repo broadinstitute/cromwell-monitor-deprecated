@@ -90,7 +90,6 @@ def get_time_series(metric_descriptor, value):
 def report():
   cpu_percent = ps.cpu_percent()
   disk_io = ps.disk_io_counters()
-  net_io = ps.net_io_counters()
 
   create_time_series([
     get_time_series(CPU_UTILIZATION_METRIC, { 'double_value': cpu_percent }),
@@ -98,8 +97,8 @@ def report():
     get_time_series(DISK_UTILIZATION_METRIC, { 'double_value': disk_used / DISK_SIZE * 100 }),
     get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io.read_count - disk_reads) / report_time }),
     get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io.write_count - disk_writes) / report_time }),
-    get_time_series(NETWORK_IN_METRIC, { 'int64_value': net_io.bytes_recv }),
-    get_time_series(NETWORK_OUT_METRIC, { 'int64_value': net_io.bytes_sent }),
+    get_time_series(DISK_IN_METRIC, { 'int64_value': disk_io.read_bytes }),
+    get_time_series(DISK_OUT_METRIC, { 'int64_value': disk_io.write_bytes }),
   ])
 
 ### Define constants
@@ -190,14 +189,14 @@ DISK_WRITES_METRIC = get_metric(
   'Disk write IOPS in a Cromwell task call',
 )
 
-NETWORK_IN_METRIC = get_metric(
-  'net_in', 'INT64', 'By',
-  'Cumulative inbound network traffic in a Cromwell task call',
+DISK_IN_METRIC = get_metric(
+  'disk_in', 'INT64', 'By',
+  'Cumulative disk bytes read in a Cromwell task call',
 )
 
-NETWORK_OUT_METRIC = get_metric(
-  'net_out', 'INT64', 'By',
-  'Cumulative outbound network traffic in a Cromwell task call',
+DISK_OUT_METRIC = get_metric(
+  'disk_out', 'INT64', 'By',
+  'Cumulative disk bytes written in a Cromwell task call',
 )
 
 ### Detect container termination
