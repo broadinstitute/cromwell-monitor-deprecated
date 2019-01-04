@@ -17,7 +17,7 @@ def get_metadata(key):
   ).text
 
 def reset():
-  global memory_used, disk_used, disk_reads, disk_writes, report_time
+  global memory_used, disk_used, disk_reads, disk_writes, net_in, net_out, report_time
 
   # Explicitly reset the CPU counter, because the first call of this method always reports 0
   ps.cpu_percent()
@@ -28,6 +28,10 @@ def reset():
   disk_io = ps.disk_io_counters()
   disk_reads = disk_io.read_count
   disk_writes = disk_io.write_count
+
+  net_io = ps.net_io_counters()
+  net_in = net_io.bytes_recv
+  net_out = net_io.bytes_sent
 
   report_time = 0
 
@@ -90,6 +94,7 @@ def get_time_series(metric_descriptor, value):
 def report():
   cpu_percent = ps.cpu_percent()
   disk_io = ps.disk_io_counters()
+  net_io = ps.net_io_counters()
 
   create_time_series([
     get_time_series(CPU_UTILIZATION_METRIC, { 'double_value': cpu_percent }),
@@ -97,6 +102,8 @@ def report():
     get_time_series(DISK_UTILIZATION_METRIC, { 'double_value': float(disk_used) / DISK_SIZE * 100 }),
     get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io.read_count - disk_reads) / report_time }),
     get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io.write_count - disk_writes) / report_time }),
+    get_time_series(NETWORK_IN_METRIC, { 'int64_value': net_io.bytes_recv - net_in }),
+    get_time_series(NETWORK_OUT_METRIC, { 'int64_value': net_io.bytes_sent - net_out }),
   ])
 
 ### Define constants
@@ -185,6 +192,16 @@ DISK_READS_METRIC = get_metric(
 DISK_WRITES_METRIC = get_metric(
   'disk_writes', 'DOUBLE', '{writes}/s',
   'Disk write IOPS in a Cromwell task call',
+)
+
+NETWORK_IN_METRIC = get_metric(
+  'net_in', 'INT64', 'By',
+  'Network bytes read in a Cromwell task call',
+)
+
+NETWORK_OUT_METRIC = get_metric(
+  'net_out', 'INT64', 'By',
+  'Network bytes written in a Cromwell task call',
 )
 
 ### Detect container termination
