@@ -96,8 +96,6 @@ def report():
     get_time_series(DISK_UTILIZATION_METRIC, { 'double_value': disk_used / DISK_SIZE * 100 }),
     get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io('read_count') - disk_reads) / report_time }),
     get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io('write_count') - disk_writes) / report_time }),
-    get_time_series(DISK_IN_METRIC, { 'int64_value': disk_io('read_bytes') }),
-    get_time_series(DISK_OUT_METRIC, { 'int64_value': disk_io('write_bytes') - DISK_SIZE }),
   ])
 
 ### Define constants
@@ -186,16 +184,6 @@ DISK_READS_METRIC = get_metric(
 DISK_WRITES_METRIC = get_metric(
   'disk_writes', 'DOUBLE', '{writes}/s',
   'Disk write IOPS in a Cromwell task call',
-)
-
-DISK_IN_METRIC = get_metric(
-  'disk_in', 'INT64', 'By',
-  'Cumulative disk bytes read in a Cromwell task call',
-)
-
-DISK_OUT_METRIC = get_metric(
-  'disk_out', 'INT64', 'By',
-  'Cumulative disk bytes written in a Cromwell task call',
 )
 
 ### Detect container termination
