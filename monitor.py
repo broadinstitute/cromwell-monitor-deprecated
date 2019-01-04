@@ -98,12 +98,12 @@ def report():
 
   create_time_series([
     get_time_series(CPU_UTILIZATION_METRIC, { 'double_value': cpu_percent }),
-    get_time_series(MEMORY_UTILIZATION_METRIC, { 'double_value': float(memory_used) / MEMORY_SIZE * 100 }),
-    get_time_series(DISK_UTILIZATION_METRIC, { 'double_value': float(disk_used) / DISK_SIZE * 100 }),
+    get_time_series(MEMORY_UTILIZATION_METRIC, { 'double_value': memory_used / MEMORY_SIZE * 100 }),
+    get_time_series(DISK_UTILIZATION_METRIC, { 'double_value': disk_used / DISK_SIZE * 100 }),
     get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io.read_count - disk_reads) / report_time }),
     get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io.write_count - disk_writes) / report_time }),
-    get_time_series(NETWORK_IN_METRIC, { 'int64_value': net_io.bytes_recv - net_in }),
-    get_time_series(NETWORK_OUT_METRIC, { 'int64_value': net_io.bytes_sent - net_out }),
+    get_time_series(NETWORK_IN_METRIC, { 'double_value': (net_io.bytes_recv - net_in) / report_time }),
+    get_time_series(NETWORK_OUT_METRIC, { 'double_value': (net_io.bytes_sent - net_out) / report_time }),
   ])
 
 ### Define constants
@@ -195,13 +195,13 @@ DISK_WRITES_METRIC = get_metric(
 )
 
 NETWORK_IN_METRIC = get_metric(
-  'net_in', 'INT64', 'By',
-  'Network bytes read in a Cromwell task call',
+  'net_in', 'DOUBLE', 'By/s',
+  'Inbound network traffic in a Cromwell task call',
 )
 
 NETWORK_OUT_METRIC = get_metric(
-  'net_out', 'INT64', 'By',
-  'Network bytes written in a Cromwell task call',
+  'net_out', 'DOUBLE', 'By/s',
+  'Outbound network traffic in a Cromwell task call',
 )
 
 ### Detect container termination
