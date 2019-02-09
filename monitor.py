@@ -156,8 +156,8 @@ def get_time_series(metric_descriptor, value):
   series.resource.labels['instance_id'] = MACHINE['name']
 
   point = series.points.add(value=value)
-  end_time = int(time()) if running else max(time(), last_time + REPORT_TIME_SEC_MIN)
-  point.interval.end_time.seconds = end_time
+  end_time = max(time(), last_time + REPORT_TIME_SEC_MIN)
+  point.interval.end_time.seconds = int(end_time)
 
   return series
 
