@@ -156,7 +156,7 @@ def get_time_series(metric_descriptor, value):
   series.resource.labels['instance_id'] = MACHINE['name']
 
   point = series.points.add(value=value)
-  end_time = max(time(), last_time + REPORT_TIME_SEC_MIN)
+  end_time = max(time(), last_time + REPORT_TIME_SEC)
   point.interval.end_time.seconds = int(end_time)
 
   return series
@@ -194,9 +194,7 @@ PROJECT_NAME = client.project_path(MACHINE['project'])
 METRIC_ROOT = 'wdl_task'
 
 MEASUREMENT_TIME_SEC = 1
-REPORT_TIME_SEC = 60
-REPORT_TIME_SEC_MIN = 60
-assert(REPORT_TIME_SEC >= REPORT_TIME_SEC_MIN)
+REPORT_TIME_SEC = 60 # must be >= 1 min
 
 LABEL_DESCRIPTORS = [
   LabelDescriptor(
