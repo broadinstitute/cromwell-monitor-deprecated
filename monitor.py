@@ -87,7 +87,7 @@ def get_disk_hour(machine, pricelist):
   return total
 
 def reset():
-  global memory_used, disk_used, disk_reads, disk_writes, report_time
+  global memory_used, disk_used, disk_reads, disk_writes, last_time
 
   # Explicitly reset the CPU counter, because the first call of this method always reports 0
   ps.cpu_percent()
@@ -98,15 +98,14 @@ def reset():
   disk_reads = disk_io('read_count')
   disk_writes = disk_io('write_count')
 
-  report_time = 0
+  last_time = time()
 
 def measure():
-  global memory_used, disk_used, report_time
+  global memory_used, disk_used
 
   memory_used = max(memory_used, MEMORY_SIZE - mem_usage('available'))
   disk_used = max(disk_used, disk_usage('used'))
 
-  report_time += MEASUREMENT_TIME_SEC
   sleep(MEASUREMENT_TIME_SEC)
 
 def mem_usage(param):
@@ -138,6 +137,7 @@ def create_time_series(series):
   client.create_time_series(PROJECT_NAME, series)
 
 def get_time_series(metric_descriptor, value):
+  global last_time
   series = TimeSeries()
 
   series.metric.type = metric_descriptor.type
@@ -156,17 +156,20 @@ def get_time_series(metric_descriptor, value):
   series.resource.labels['instance_id'] = MACHINE['name']
 
   point = series.points.add(value=value)
-  point.interval.end_time.seconds = int(time())
+  end_time = int(time()) if running else max(time(), last_time + REPORT_TIME_SEC_MIN)
+  point.interval.end_time.seconds = end_time
 
   return series
 
 def report():
+  global last_time
+  time_delta = time() - last_time
   create_time_series([
     get_time_series(CPU_UTILIZATION_METRIC, { 'double_value': ps.cpu_percent() }),
     get_time_series(MEMORY_UTILIZATION_METRIC, { 'double_value': memory_used / MEMORY_SIZE * 100 }),
     get_time_series(DISK_UTILIZATION_METRIC, { 'double_value': disk_used / DISK_SIZE * 100 }),
-    get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io('read_count') - disk_reads) / report_time }),
-    get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io('write_count') - disk_writes) / report_time }),
+    get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io('read_count') - disk_reads) / time_delta }),
+    get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io('write_count') - disk_writes) / time_delta }),
     get_time_series(COST_ESTIMATE_METRIC, { 'double_value': (time() - ps.boot_time()) * COST_PER_SEC }),
   ])
 
@@ -192,6 +195,8 @@ METRIC_ROOT = 'wdl_task'
 
 MEASUREMENT_TIME_SEC = 1
 REPORT_TIME_SEC = 60
+REPORT_TIME_SEC_MIN = 60
+assert(REPORT_TIME_SEC >= REPORT_TIME_SEC_MIN)
 
 LABEL_DESCRIPTORS = [
   LabelDescriptor(
@@ -290,7 +295,7 @@ signal(SIGTERM, signal_handler)
 reset()
 while running:
   measure()
-  if not running or report_time >= REPORT_TIME_SEC:
+  if not running or (time() - last_time) >= REPORT_TIME_SEC:
     report()
     reset()
 exit(0)
