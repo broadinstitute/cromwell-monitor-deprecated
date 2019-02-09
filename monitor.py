@@ -149,6 +149,7 @@ def get_time_series(metric_descriptor, value):
   labels['cpu_count'] = CPU_COUNT_LABEL
   labels['mem_size'] = MEMORY_SIZE_LABEL
   labels['disk_size'] = DISK_SIZE_LABEL
+  labels['preemptible'] = PREEMPTIBLE_LABEL
 
   series.resource.type = 'gce_instance'
   series.resource.labels['zone'] = MACHINE['zone']
@@ -221,6 +222,10 @@ LABEL_DESCRIPTORS = [
     key='disk_size',
     description='Total disk size, GB',
   ),
+  LabelDescriptor(
+    key='preemptible',
+    description='Preemptible flag',
+  ),
 ]
 
 CPU_COUNT = ps.cpu_count()
@@ -231,6 +236,8 @@ MEMORY_SIZE_LABEL = format_gb(MEMORY_SIZE)
 
 DISK_SIZE = disk_usage('total')
 DISK_SIZE_LABEL = format_gb(DISK_SIZE)
+
+PREEMPTIBLE_LABEL = str(MACHINE['preemptible']).lower()
 
 CPU_UTILIZATION_METRIC = get_metric(
   'cpu_utilization', 'DOUBLE', '%',
