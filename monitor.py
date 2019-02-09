@@ -167,7 +167,7 @@ def report():
     get_time_series(DISK_UTILIZATION_METRIC, { 'double_value': disk_used / DISK_SIZE * 100 }),
     get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io('read_count') - disk_reads) / report_time }),
     get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io('write_count') - disk_writes) / report_time }),
-    get_time_series(COST_ESTIMATE_METRIC, { 'double_value': (time() - ps.boot_time()) * HOURLY_PRICE }),
+    get_time_series(COST_ESTIMATE_METRIC, { 'double_value': (time() - ps.boot_time()) * COST_PER_SEC }),
   ])
 
 ### Define constants
@@ -183,7 +183,7 @@ DISK_MOUNTS = environ['DISK_MOUNTS'].split()
 # Get billing rates
 MACHINE = get_machine_info()
 PRICELIST = get_pricelist()
-HOURLY_PRICE = get_machine_hour(MACHINE, PRICELIST) + get_disk_hour(MACHINE, PRICELIST)
+COST_PER_SEC = (get_machine_hour(MACHINE, PRICELIST) + get_disk_hour(MACHINE, PRICELIST)) / 3600
 
 client = MetricServiceClient()
 PROJECT_NAME = client.project_path(MACHINE['project'])
