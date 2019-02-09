@@ -1,6 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from functools import reduce
+from googleapiclient.discovery import build as google_api
 from google.cloud.monitoring_v3 import MetricServiceClient
 from google.cloud.monitoring_v3.types import LabelDescriptor, MetricDescriptor, TimeSeries
 from os import environ
@@ -10,11 +11,80 @@ from signal import signal, SIGTERM
 from sys import stderr
 from time import sleep, time
 
-def get_metadata(key):
-  return requests.get(
-    'http://metadata.google.internal/computeMetadata/v1/instance/' + key,
+compute = google_api('compute', 'v1')
+
+def get_machine_info():
+  metadata = requests.get(
+    'http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true',
     headers={'Metadata-Flavor': 'Google'}
-  ).text
+  ).json()
+
+  name = metadata['name']
+  _, project, _, zone = metadata['zone'].split('/')
+  instance = compute.instances().get(project=project, zone=zone, instance=name).execute()
+
+  disks = [get_disk(project, zone, disk) for disk in instance['disks']]
+
+  return {
+    'project': project,
+    'zone': zone,
+    'region': zone[:-2],
+    'name': name,
+    'type': instance['machineType'].split('/')[-1],
+    'preemptible': instance['scheduling']['preemptible'],
+    'disks': disks,
+  }
+
+def get_disk(project, zone, disk):
+  if disk['type'] == 'PERSISTENT':
+    name = disk['source'].split('/')[-1]
+    resource = compute.disks().get(project=project, zone=zone, disk=name).execute()
+    return {
+      'type': resource['type'].split('/')[-1],
+      'sizeGb': int(resource['sizeGb']),
+    }
+  else:
+    return {
+      'type': 'local-ssd',
+      'sizeGb': 375,
+    }
+
+def get_pricelist():
+  return requests.get(
+    'http://cloudpricingcalculator.appspot.com/static/data/pricelist.json',
+  ).json()['gcp_price_list']
+
+def get_price_key(key, preemptible):
+  return 'CP-COMPUTEENGINE-' + key + ('-PREEMPTIBLE' if preemptible else '')
+
+def get_machine_hour(machine, pricelist):
+  if machine['type'].startswith('custom'):
+    _, core, memory = machine['type'].split('-')
+    core_key = get_price_key('CUSTOM-VM-CORE', machine['preemptible'])
+    memory_key = get_price_key('CUSTOM-VM-RAM', machine['preemptible'])
+    return pricelist[core_key][machine['region']] * int(core) + \
+      pricelist[memory_key][machine['region']] * int(memory) / 2**10
+  else:
+    price_key = get_price_key('VMIMAGE-' + machine['type'].upper(), machine['preemptible'])
+    return pricelist[price_key][machine['region']]
+
+def get_disk_hour(machine, pricelist):
+  total = 0
+  for disk in machine['disks']:
+    price_key = 'CP-COMPUTEENGINE-'
+    if disk['type'] == 'pd-standard':
+      price_key += 'STORAGE-PD-CAPACITY'
+    elif disk['type'] == 'pd-ssd':
+      price_key += 'STORAGE-PD-SSD'
+    elif disk['type'] == 'local-ssd':
+      price_key += 'LOCAL-SSD'
+      if machine['preemptible']:
+        price_key += '-PREEMPTIBLE'
+    price = pricelist[price_key][machine['region']] * disk['sizeGb']
+    if disk['type'].startswith('pd'):
+      price /= 730 # hours per month
+    total += price
+  return total
 
 def reset():
   global memory_used, disk_used, disk_reads, disk_writes, report_time
@@ -81,8 +151,8 @@ def get_time_series(metric_descriptor, value):
   labels['disk_size'] = DISK_SIZE_LABEL
 
   series.resource.type = 'gce_instance'
-  series.resource.labels['zone'] = ZONE
-  series.resource.labels['instance_id'] = INSTANCE
+  series.resource.labels['zone'] = MACHINE['zone']
+  series.resource.labels['instance_id'] = MACHINE['name']
 
   point = series.points.add(value=value)
   point.interval.end_time.seconds = int(time())
@@ -96,6 +166,7 @@ def report():
     get_time_series(DISK_UTILIZATION_METRIC, { 'double_value': disk_used / DISK_SIZE * 100 }),
     get_time_series(DISK_READS_METRIC, { 'double_value': (disk_io('read_count') - disk_reads) / report_time }),
     get_time_series(DISK_WRITES_METRIC, { 'double_value': (disk_io('write_count') - disk_writes) / report_time }),
+    get_time_series(COST_ESTIMATE_METRIC, { 'double_value': (time() - ps.boot_time()) * HOURLY_PRICE }),
   ])
 
 ### Define constants
@@ -108,13 +179,13 @@ TASK_CALL_INDEX = environ['TASK_CALL_INDEX']
 TASK_CALL_ATTEMPT = environ['TASK_CALL_ATTEMPT']
 DISK_MOUNTS = environ['DISK_MOUNTS'].split()
 
-# GCP instance name, zone and project
-# from instance introspection API
-INSTANCE = get_metadata('name')
-_, PROJECT, _, ZONE = get_metadata('zone').split('/')
+# Get billing rates
+MACHINE = get_machine_info()
+PRICELIST = get_pricelist()
+HOURLY_PRICE = get_machine_hour(MACHINE, PRICELIST) + get_disk_hour(MACHINE, PRICELIST)
 
 client = MetricServiceClient()
-PROJECT_NAME = client.project_path(PROJECT)
+PROJECT_NAME = client.project_path(MACHINE['project'])
 
 METRIC_ROOT = 'wdl_task'
 
@@ -184,6 +255,11 @@ DISK_READS_METRIC = get_metric(
 DISK_WRITES_METRIC = get_metric(
   'disk_writes', 'DOUBLE', '{writes}/s',
   'Disk write IOPS in a Cromwell task call',
+)
+
+COST_ESTIMATE_METRIC = get_metric(
+  'runtime_cost_estimate', 'DOUBLE', 'USD',
+  'Cumulative runtime cost estimate for a Cromwell task call',
 )
 
 ### Detect container termination
