@@ -10,6 +10,7 @@ RUN apk add --no-cache \
       linux-headers \
     && \
     pip install -r requirements.txt && \
+    wget http://cloudpricingcalculator.appspot.com/static/data/pricelist.json && \
     apk del \
       build-base \
       linux-headers

@@ -4,6 +4,7 @@ from functools import reduce
 from googleapiclient.discovery import build as google_api
 from google.cloud.monitoring_v3 import MetricServiceClient
 from google.cloud.monitoring_v3.types import LabelDescriptor, MetricDescriptor, TimeSeries
+import json
 from os import environ
 import psutil as ps
 import requests
@@ -49,10 +50,11 @@ def get_disk(project, zone, disk):
       'sizeGb': 375,
     }
 
+PRICELIST_JSON = 'pricelist.json'
+
 def get_pricelist():
-  return requests.get(
-    'http://cloudpricingcalculator.appspot.com/static/data/pricelist.json',
-  ).json()['gcp_price_list']
+  with open(PRICELIST_JSON, 'r') as f:
+    return json.load(f)['gcp_price_list']
 
 def get_price_key(key, preemptible):
   return 'CP-COMPUTEENGINE-' + key + ('-PREEMPTIBLE' if preemptible else '')
