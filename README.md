@@ -1,4 +1,6 @@
-# Cromwell task monitor
+# Cromwell task monitor (Deprecated)
+
+**NOTICE: This repository has been deprecated in favor of [broadinstitute/cromwell-task-monitor-bq](https://github.com/broadinstitute/cromwell-task-monitor-bq)**
 
 This repo contains code for monitoring resource utilization in
 [Cromwell](https://github.com/broadinstitute/cromwell)
